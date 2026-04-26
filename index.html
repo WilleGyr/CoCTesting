@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SWE Familjen</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <a href="#/" class="brand">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="14" viewBox="0 0 24 15" class="brand-flag" aria-label="Sverige"><rect width="24" height="15" rx="2" fill="#006AA7"/><rect x="8" width="3" height="15" fill="#FECC00"/><rect y="6" width="24" height="3" fill="#FECC00"/></svg>
+        SWE Familjen
+      </a>
+      <nav class="nav">
+        <a href="#/" data-route="family">Familjen</a>
+        <a href="#/wars" data-route="wars">Wars</a>
+        <a href="#/legends" data-route="legends">Legends</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="app" class="container">
+    <div class="loading">
+      <span class="loading-pulse"></span>
+      Laddar…
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
