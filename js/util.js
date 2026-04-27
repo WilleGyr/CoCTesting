@@ -98,22 +98,63 @@ function shortenLeague(name) {
   return name.replace(' League', '');
 }
 
-// CoC seasons end the last Monday of the month at 05:00 UTC.
-// Returns YYYY-MM-DD start of current season.
-export function currentSeasonStart() {
-  const now = new Date();
-  const lastMonday = (year, month) => {
-    const d = new Date(Date.UTC(year, month + 1, 0));
-    while (d.getUTCDay() !== 1) d.setUTCDate(d.getUTCDate() - 1);
-    return d;
-  };
-  let start = lastMonday(now.getUTCFullYear(), now.getUTCMonth() - 1);
-  let end = lastMonday(now.getUTCFullYear(), now.getUTCMonth());
-  if (now < start) {
-    start = lastMonday(now.getUTCFullYear(), now.getUTCMonth() - 2);
-    end = lastMonday(now.getUTCFullYear(), now.getUTCMonth() - 1);
-  } else if (now >= end) {
-    start = end;
+// Legend League seasons run on a fixed 4-week (28-day) cycle, independent
+// of the general trophy season (which uses last-Monday-of-month).
+// Anchor: May 2026 season starts 2026-04-20 at 05:00 UTC (07:00 CEST).
+const LEGEND_SEASON_ANCHOR_MS = Date.UTC(2026, 3, 20, 5, 0, 0);
+const LEGEND_SEASON_LENGTH_MS = 28 * 24 * 60 * 60 * 1000;
+const LEGEND_DAY_RESET_HOUR_UTC = 5; // 05:00 UTC = 07:00 CEST
+
+export function currentLegendSeasonStart() {
+  const elapsed = Date.now() - LEGEND_SEASON_ANCHOR_MS;
+  const cycles = Math.floor(elapsed / LEGEND_SEASON_LENGTH_MS);
+  const startMs = LEGEND_SEASON_ANCHOR_MS + cycles * LEGEND_SEASON_LENGTH_MS;
+  return new Date(startMs).toISOString().slice(0, 10);
+}
+
+// Unix-ms of the start of the current Legend day (last 05:00 UTC).
+export function legendDayStartMs(now = Date.now()) {
+  const d = new Date(now);
+  d.setUTCHours(LEGEND_DAY_RESET_HOUR_UTC, 0, 0, 0);
+  if (d.getTime() > now) d.setUTCDate(d.getUTCDate() - 1);
+  return d.getTime();
+}
+
+// Trophy change → star count, based on Legend trophy reward bands:
+//   0★ = 1–4, 1★ = 5–15, 2★ = 16–32, 3★ = 33+
+export function inferLegendStars(change) {
+  const c = Math.abs(change);
+  if (c >= 33) return 3;
+  if (c >= 16) return 2;
+  if (c >= 5) return 1;
+  return 0;
+}
+
+// { attacks, defenses } from worker `legends` data, filtered to the current
+// Legend day window. Each entry is { change, time, trophies } already.
+export function currentLegendDayEvents(legends, now = Date.now()) {
+  const startMs = legendDayStartMs(now);
+  const endMs = startMs + 24 * 60 * 60 * 1000;
+  const attacks = [];
+  const defenses = [];
+  for (const date of Object.keys(legends || {})) {
+    const day = legends[date];
+    for (const a of (day.new_attacks || [])) {
+      const t = a.time * 1000;
+      if (t >= startMs && t < endMs) attacks.push(a);
+    }
+    for (const d of (day.new_defenses || [])) {
+      const t = d.time * 1000;
+      if (t >= startMs && t < endMs) defenses.push(d);
+    }
   }
-  return start.toISOString().slice(0, 10);
+  attacks.sort((a, b) => a.time - b.time);
+  defenses.sort((a, b) => a.time - b.time);
+  return { attacks, defenses };
+}
+
+// HH:MM in user's local time.
+export function formatHM(unixSec) {
+  const d = new Date(unixSec * 1000);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }

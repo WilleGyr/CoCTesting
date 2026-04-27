@@ -1,6 +1,9 @@
 import { api } from '../api.js';
 import { SWEDEN_LOCATION_ID } from '../config.js';
-import { fmt, escapeHtml, urlToTag, tagToUrl, currentSeasonStart, formatWarDate, derivedLeague } from '../util.js';
+import {
+  fmt, escapeHtml, urlToTag, tagToUrl, formatWarDate, derivedLeague,
+  currentLegendSeasonStart, currentLegendDayEvents, inferLegendStars, formatHM,
+} from '../util.js';
 import { applyChartDefaults, COLORS } from '../charts.js';
 import { icons } from '../icons.js';
 
@@ -20,10 +23,11 @@ export async function renderPlayer(root, urlTag) {
   applyChartDefaults();
 
   const inLegends = stats.leagueTier?.name === 'Legend League';
-  const seasonStart = currentSeasonStart();
+  const seasonStart = currentLegendSeasonStart();
   const seasonDays = Object.keys(stats.legends || {})
     .filter(d => d >= seasonStart)
     .sort();
+  const today = currentLegendDayEvents(stats.legends);
   const ls = stats.legendStatistics;
 
   root.innerHTML = `
@@ -69,6 +73,8 @@ export async function renderPlayer(root, urlTag) {
           </div>` : ''}
       </div>
     </div>
+
+    ${inLegends ? renderTodaySection(today, stats.trophies) : ''}
 
     <section class="section">
       <div class="section-title">${icons.zap()} Legend league — current season</div>
@@ -117,6 +123,69 @@ export async function renderPlayer(root, urlTag) {
   if (seasonDays.length > 0) {
     drawLegendChart(seasonDays, stats.legends);
   }
+}
+
+function renderTodaySection(today, currentTrophies) {
+  const atkCount = today.attacks.length;
+  const defCount = today.defenses.length;
+  const gain = today.attacks.reduce((s, a) => s + a.change, 0);
+  const loss = today.defenses.reduce((s, d) => s + d.change, 0);
+  const net = gain - loss;
+  return `
+    <section class="section">
+      <div class="section-title">${icons.activity()} Idag <span class="section-meta">(sedan 07:00)</span></div>
+      <div class="stat-row">
+        <div class="stat-card">
+          <div class="stat-label">${icons.swords()} Attacks</div>
+          <div class="stat-value">${atkCount}<span class="stat-denom"> / 8</span></div>
+          <div class="stat-sub positive">+${fmt(gain)}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">${icons.shield()} Defenses</div>
+          <div class="stat-value">${defCount}<span class="stat-denom"> / 8</span></div>
+          <div class="stat-sub negative">−${fmt(loss)}</div>
+        </div>
+        <div class="stat-card ${net >= 0 ? '' : 'negative-card'}">
+          <div class="stat-label">${icons.trendUp()} Net</div>
+          <div class="stat-value ${net >= 0 ? 'positive' : 'negative'}">${net >= 0 ? '+' : ''}${fmt(net)}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">${icons.trophy()} Current</div>
+          <div class="stat-value"><span class="trophy">${fmt(currentTrophies)}</span></div>
+        </div>
+      </div>
+      <div class="today-events">
+        <div class="today-col">
+          <div class="today-col-title">${icons.swords({size:14})} Attacks · ${atkCount}/8</div>
+          ${atkCount === 0
+            ? `<div class="today-empty">Inga attacks idag än</div>`
+            : today.attacks.map(e => renderTodayEvent(e, true)).join('')}
+        </div>
+        <div class="today-col">
+          <div class="today-col-title">${icons.shield({size:14})} Defenses · ${defCount}/8</div>
+          ${defCount === 0
+            ? `<div class="today-empty">Inga defenses idag än</div>`
+            : today.defenses.map(e => renderTodayEvent(e, false)).join('')}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderTodayEvent(e, isAttack) {
+  const stars = inferLegendStars(e.change);
+  const filled = '★'.repeat(stars);
+  const empty = '☆'.repeat(3 - stars);
+  const sign = isAttack ? '+' : '−';
+  const cls = isAttack ? 'positive' : 'negative';
+  return `
+    <div class="today-event">
+      <span class="today-stars stars-${stars}">${filled}<span class="today-stars-empty">${empty}</span></span>
+      <span class="today-change ${cls}">${sign}${fmt(e.change)}</span>
+      <span class="today-trophies">${fmt(e.trophies)}</span>
+      <span class="today-time">${formatHM(e.time)}</span>
+    </div>
+  `;
 }
 
 function renderLegendSummary(seasonDays, legends) {

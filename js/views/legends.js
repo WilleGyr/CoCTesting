@@ -1,6 +1,6 @@
 import { api } from '../api.js';
 import { FAMILY_CLANS, SWEDEN_LOCATION_ID, LEGEND_TROPHY_THRESHOLD } from '../config.js';
-import { fmt, escapeHtml, tagToUrl, currentSeasonStart } from '../util.js';
+import { fmt, escapeHtml, tagToUrl, currentLegendSeasonStart, currentLegendDayEvents } from '../util.js';
 import { icons } from '../icons.js';
 
 export async function renderLegends(root) {
@@ -17,8 +17,7 @@ export async function renderLegends(root) {
     m.leagueTier?.name === 'Legend League'
   );
 
-  const seasonStart = currentSeasonStart();
-  const today = new Date().toISOString().slice(0, 10);
+  const seasonStart = currentLegendSeasonStart();
 
   // Fetch player stats (for global rank) + per-day legend data in parallel
   const enriched = await Promise.all(legendMembers.map(async m => {
@@ -26,7 +25,7 @@ export async function renderLegends(root) {
       api.playerStats(m.tag).catch(() => null),
       api.playerLegends(m.tag).catch(() => ({ legends: {} })),
     ]);
-    const todayData = legendData.legends?.[today] || {};
+    const todayEvents = currentLegendDayEvents(legendData.legends);
     const seasonDays = Object.keys(legendData.legends || {}).filter(d => d >= seasonStart);
     let seasonNet = 0;
     for (const d of seasonDays) {
@@ -38,10 +37,10 @@ export async function renderLegends(root) {
       ...m,
       trophies: playerData?.trophies ?? m.trophies,
       globalRank: playerData?.legendStatistics?.currentSeason?.rank || null,
-      todayAttacks: (todayData.attacks || []).length,
-      todayDefenses: (todayData.defenses || []).length,
-      todayGain: (todayData.attacks || []).reduce((a, b) => a + b, 0),
-      todayLoss: (todayData.defenses || []).reduce((a, b) => a + b, 0),
+      todayAttacks: todayEvents.attacks.length,
+      todayDefenses: todayEvents.defenses.length,
+      todayGain: todayEvents.attacks.reduce((s, e) => s + e.change, 0),
+      todayLoss: todayEvents.defenses.reduce((s, e) => s + e.change, 0),
       seasonNet,
       seasonDays: seasonDays.length,
     };
