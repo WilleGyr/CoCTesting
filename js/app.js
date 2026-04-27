@@ -51,8 +51,29 @@ async function route() {
     }
   } catch (err) {
     console.error(err);
-    app.innerHTML = `<div class="error">Kunde inte ladda: ${err.message}</div>`;
+    if (err.isCocUpstream) {
+      app.innerHTML = renderOutage(err.status);
+      app.querySelector('.outage-retry')?.addEventListener('click', () => location.reload());
+    } else {
+      app.innerHTML = `<div class="error">Kunde inte ladda: ${err.message}</div>`;
+    }
   }
+}
+
+function renderOutage(status) {
+  const icon = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2"/><rect width="20" height="8" x="2" y="14" rx="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/><line x1="2" x2="22" y1="2" y2="22" stroke-width="1.8"/></svg>`;
+  return `
+    <div class="outage">
+      <div class="outage-icon">${icon}</div>
+      <h2 class="outage-title">Supercells API är nere</h2>
+      <p class="outage-desc">
+        Clash of Clans servrar svarar inte just nu. Det här gäller alla
+        tjänster som hämtar data från Supercell — inte bara den här sidan.
+      </p>
+      <p class="outage-meta">Upstream-status: ${status} · oftast nere några minuter, ibland under måndagsunderhåll.</p>
+      <button class="outage-retry" type="button">Försök igen</button>
+    </div>
+  `;
 }
 
 window.addEventListener('hashchange', route);

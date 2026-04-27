@@ -28,7 +28,13 @@ async function fetchJson(url, cacheKey) {
     if (cached) return cached;
   }
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`API ${res.status}: ${url}`);
+  if (!res.ok) {
+    const err = new Error(`API ${res.status}: ${url}`);
+    err.status = res.status;
+    err.url = url;
+    err.isCocUpstream = url.includes('/coc/') && res.status >= 500;
+    throw err;
+  }
   const data = await res.json();
   if (cacheKey) cacheSet(cacheKey, data);
   return data;
