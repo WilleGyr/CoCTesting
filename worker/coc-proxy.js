@@ -14,15 +14,15 @@ const FAMILY_CLAN_TAGS = [
 const KV_TTL_DAYS = 365;
 
 export default {
-  async fetch(request, env) {
-    return handleHttp(request, env);
+  async fetch(request, env, ctx) {
+    return handleHttp(request, env, ctx);
   },
   async scheduled(event, env, ctx) {
     ctx.waitUntil(pollAllClans(env));
   },
 };
 
-async function handleHttp(request, env) {
+async function handleHttp(request, env, ctx) {
   const url = new URL(request.url);
   const cors = {
     'Access-Control-Allow-Origin': '*',
@@ -38,8 +38,22 @@ async function handleHttp(request, env) {
     let m = url.pathname.match(/^\/legends\/(.+)$/);
     if (m) {
       const tag = decodeURIComponent(m[1]);
+      const cache = caches.default;
+      const cacheKey = new Request(url.toString(), { method: 'GET' });
+      const cached = await cache.match(cacheKey);
+      if (cached) return cached;
+
       const data = await readLegends(env, tag);
-      return jsonRes(data, cors);
+      const response = new Response(JSON.stringify(data), {
+        status: 200,
+        headers: {
+          ...cors,
+          'Content-Type': 'application/json',
+          'Cache-Control': 'public, s-maxage=60',
+        },
+      });
+      ctx.waitUntil(cache.put(cacheKey, response.clone()));
+      return response;
     }
 
     m = url.pathname.match(/^\/coc\/(.+)$/);
@@ -108,9 +122,10 @@ async function trackPlayer(env, tag, trophies, now, date) {
     await env.LEGEND_KV.put(dayKey, JSON.stringify(day), {
       expirationTtl: 60 * 60 * 24 * KV_TTL_DAYS,
     });
+    await env.LEGEND_KV.put(stateKey, JSON.stringify({ trophies, time: now }));
+  } else if (!prev) {
+    await env.LEGEND_KV.put(stateKey, JSON.stringify({ trophies, time: now }));
   }
-
-  await env.LEGEND_KV.put(stateKey, JSON.stringify({ trophies, time: now }));
 }
 
 async function readLegends(env, tag) {
